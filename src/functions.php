@@ -78,16 +78,11 @@ function resolveUri(UriInterface $base, UriInterface $uri): UriInterface
  */
 function isValidUrl(string $url): bool
 {
-    // First, use standard PHP url filtering.
+    // First, use standard PHP URL filtering.
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
         return false;
     }
-    // Next, check the host for problematic IPs.
     $parts = parse_url($url);
-    if (empty($parts['host'])) {
-        // This would be an internal Url, which is valid.
-        return false;
-    }
     $host = $parts['host'];
     // Normalize IPv6 literal formatting wrapping (e.g., [::1] -> ::1)
     if (strpos($host, '[') === 0 && strpos($host, ']') === (strlen($host) - 1)) {
