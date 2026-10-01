@@ -253,7 +253,9 @@ class Extractor
             if (!isHttp($uri)) {
                 throw new InvalidArgumentException(sprintf('Uri string must use http or https scheme (%s)', $uri));
             }
-
+            if (!isValidUrl($uri)) {
+                throw new InvalidArgumentException(sprintf('Access to this URL is blocked for security reasons (%s)', $uri));
+            }
             $uri = $this->crawler->createUri($uri);
         }
 
