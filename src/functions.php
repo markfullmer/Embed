@@ -83,7 +83,7 @@ function isValidUrl(string $url): bool
         return false;
     }
     $parts = parse_url($url);
-    $host = $parts['host'];
+    $host = $parts['host'] ?? '';
     // Normalize IPv6 literal formatting wrapping (e.g., [::1] -> ::1)
     if (strpos($host, '[') === 0 && strpos($host, ']') === (strlen($host) - 1)) {
         $host = substr($host, 1, -1);
