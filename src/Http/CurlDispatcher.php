@@ -152,6 +152,8 @@ final class CurlDispatcher
             CURLOPT_CAINFO => CaBundle::getSystemCaRootBundlePath(),
             CURLOPT_AUTOREFERER => true,
             CURLOPT_FOLLOWLOCATION => $settings['follow_location'] ?? true,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_USERAGENT => $settings['user_agent'] ?? $request->getHeaderLine('User-Agent'),
             CURLOPT_COOKIEJAR => $cookies,
             CURLOPT_COOKIEFILE => $cookies,
