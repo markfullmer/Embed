@@ -146,13 +146,11 @@ function isValidUrl(string $url): bool
 function isHttp(string $uri): bool
 {
     $result = preg_match('/^(\w+):/', $uri, $matches);
-    if ($result === 1) {
-        $scheme = strtolower($matches[1]);
-        return in_array($scheme, ['http', 'https'], true);
+    if ($result !== false && $result > 0) {
+        return in_array(strtolower($matches[1]), ['http', 'https'], true);
     }
 
-    // SECURE: Reject URIs without explicit http/https scheme
-    return false;
+    return true;
 }
 
 function resolvePath(string $base, string $path): string
