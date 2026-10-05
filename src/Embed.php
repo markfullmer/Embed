@@ -99,6 +99,12 @@ class Embed
             return $extractor;
         }
 
+        if (!isValidUrl((string) $redirectUri)) {
+            throw new InvalidArgumentException(sprintf(
+                'Access to this URL is blocked for security reasons (%s)',
+                $redirectUri
+            ));
+        }
         $request = $this->crawler->createRequest('GET', (string) $redirectUri);
         $response = $this->crawler->sendRequest($request);
 
