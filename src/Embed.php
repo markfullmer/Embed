@@ -7,9 +7,12 @@ use Embed\Http\Crawler;
 use InvalidArgumentException;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 
 class Embed
 {
+    private const MAX_HTTP_REDIRECTS = 10;
+
     private Crawler $crawler;
     private ExtractorFactory $extractorFactory;
 
@@ -80,8 +83,20 @@ class Embed
         $this->extractorFactory->setSettings($settings);
     }
 
-    private function extract(RequestInterface $request, ResponseInterface $response, bool $redirect = true): Extractor
+    private function extract(RequestInterface $request, ResponseInterface $response, bool $redirect = true, int $httpRedirects = 0): Extractor
     {
+        $httpRedirectUri = $this->getHttpRedirectUri($request, $response);
+        if ($httpRedirectUri !== null) {
+            if ($httpRedirects >= self::MAX_HTTP_REDIRECTS) {
+                throw new InvalidArgumentException('Maximum number of HTTP redirects exceeded');
+            }
+
+            $request = $this->createSafeRequest($httpRedirectUri);
+            $response = $this->crawler->sendRequest($request);
+
+            return $this->extract($request, $response, $redirect, $httpRedirects + 1);
+        }
+
         $uri = $this->crawler->getResponseUri($response);
         if ($uri === null) {
             $uri = $request->getUri();
@@ -99,13 +114,7 @@ class Embed
             return $extractor;
         }
 
-        if (!isValidUrl((string) $redirectUri)) {
-            throw new InvalidArgumentException(sprintf(
-                'Access to this URL is blocked for security reasons (%s)',
-                $redirectUri
-            ));
-        }
-        $request = $this->crawler->createRequest('GET', (string) $redirectUri);
+        $request = $this->createSafeRequest($redirectUri);
         $response = $this->crawler->sendRequest($request);
 
         return $this->extract($request, $response, false);
@@ -120,5 +129,27 @@ class Embed
         // Magic property access returns mixed, but we know it's ?UriInterface from Redirect detector
         $redirectUri = $extractor->redirect;
         return $redirectUri instanceof \Psr\Http\Message\UriInterface;
+    }
+
+    private function getHttpRedirectUri(RequestInterface $request, ResponseInterface $response): ?UriInterface
+    {
+        $status = $response->getStatusCode();
+        $location = $response->getHeaderLine('Location');
+
+        if ($status < 300 || $status >= 400 || $location === '') {
+            return null;
+        }
+
+        return resolveUri($request->getUri(), $this->crawler->createUri($location));
+    }
+
+    private function createSafeRequest(UriInterface $uri): RequestInterface
+    {
+        $url = (string) $uri;
+        if (!isValidUrl($url)) {
+            throw new InvalidArgumentException(sprintf('Access to this URL is blocked for security reasons (%s)', $url));
+        }
+
+        return $this->crawler->createRequest('GET', $url);
     }
 }
