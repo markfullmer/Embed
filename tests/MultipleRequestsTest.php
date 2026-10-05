@@ -4,10 +4,12 @@ declare(strict_types = 1);
 namespace Embed\Tests;
 
 use Embed\Embed;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 class MultipleRequestsTest extends TestCase
 {
+
     public function testParallel()
     {
         $embed = new Embed();
@@ -26,5 +28,14 @@ class MultipleRequestsTest extends TestCase
 
         $this->assertEquals('https://x.com/misteroom', (string) $infos[2]->url);
         $this->assertEquals('en', $infos[2]->language);
+    }
+
+    public function testInvalid(): void {
+        $this->expectException(InvalidArgumentException::class);
+
+        (new Embed())->getMulti(
+            'https://twitter.com/misteroom',
+            'https://64:ff9b::198.51.100.1'
+        );
     }
 }

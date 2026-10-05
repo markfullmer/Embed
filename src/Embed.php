@@ -4,6 +4,7 @@ declare(strict_types = 1);
 namespace Embed;
 
 use Embed\Http\Crawler;
+use InvalidArgumentException;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
@@ -20,6 +21,9 @@ class Embed
 
     public function get(string $url): Extractor
     {
+        if (!isValidUrl($url)) {
+            throw new InvalidArgumentException(sprintf('Access to this URL is blocked for security reasons (%s)', $url));
+        }
         $request = $this->crawler->createRequest('GET', $url);
         $response = $this->crawler->sendRequest($request);
 
@@ -32,7 +36,15 @@ class Embed
     public function getMulti(string ...$urls): array
     {
         $requests = array_map(
-            fn ($url) => $this->crawler->createRequest('GET', $url),
+            function ($url): RequestInterface {
+                if (!isValidUrl($url)) {
+                    throw new InvalidArgumentException(sprintf(
+                        'Access to this URL is blocked for security reasons (%s)',
+                        $url
+                    ));
+                }
+                return $this->crawler->createRequest('GET', $url);
+            },
             $urls
         );
 

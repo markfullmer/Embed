@@ -3,6 +3,9 @@ declare(strict_types = 1);
 
 namespace Embed\Tests;
 
+use Embed\Embed;
+use InvalidArgumentException;
+
 class PagesTest extends PagesTestCase
 {
     /**
@@ -209,5 +212,12 @@ class PagesTest extends PagesTestCase
     public function testBBCNews()
     {
         $this->assertEmbed('https://www.bbc.co.uk/news/uk-54222286');
+    }
+
+    public function testInvalid(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $embed = new Embed();
+        $embed->get('https://64:ff9b::198.51.100.1');
     }
 }
