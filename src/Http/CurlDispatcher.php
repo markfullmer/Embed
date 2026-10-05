@@ -9,6 +9,8 @@ use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\StreamInterface;
+use function Embed\getValidUrlIps;
+use InvalidArgumentException;
 
 /**
  * Class to fetch html pages
@@ -115,7 +117,23 @@ final class CurlDispatcher
     private function __construct(array $settings, RequestInterface $request, ?StreamFactoryInterface $streamFactory = null)
     {
         $this->request = $request;
-        $this->curl = curl_init((string) $request->getUri());
+        $uri = $request->getUri();
+        $url = (string) $uri;
+        $ips = getValidUrlIps($url);
+
+        if ($ips === []) {
+            throw new InvalidArgumentException(sprintf('Access to this URL is blocked for security reasons (%s)', $url));
+        }
+
+        $host = $uri->getHost();
+        $port = $uri->getPort() ?? ($uri->getScheme() === 'https' ? 443 : 80);
+        $resolveHost = strpos($host, ':') === false ? $host : "[{$host}]";
+        $resolveAddresses = array_values(array_map(
+            static fn (string $ip): string => strpos($ip, ':') === false ? $ip : "[{$ip}]",
+            $ips
+        ));
+
+        $this->curl = curl_init($url);
         $this->settings = $settings;
         $this->streamFactory = $streamFactory ?? FactoryDiscovery::getStreamFactory();
 
@@ -134,13 +152,18 @@ final class CurlDispatcher
             CURLOPT_CAINFO => CaBundle::getSystemCaRootBundlePath(),
             CURLOPT_AUTOREFERER => true,
             CURLOPT_FOLLOWLOCATION => $settings['follow_location'] ?? true,
-            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
             CURLOPT_USERAGENT => $settings['user_agent'] ?? $request->getHeaderLine('User-Agent'),
             CURLOPT_COOKIEJAR => $cookies,
             CURLOPT_COOKIEFILE => $cookies,
             CURLOPT_HEADERFUNCTION => [$this, 'writeHeader'],
             CURLOPT_WRITEFUNCTION => [$this, 'writeBody'],
         ]);
+
+        curl_setopt(
+            $this->curl,
+            CURLOPT_RESOLVE,
+            [sprintf('%s:%d:%s', $resolveHost, $port, implode(',', $resolveAddresses))]
+        );
     }
 
     private function getResponse(ResponseFactoryInterface $responseFactory): ResponseInterface

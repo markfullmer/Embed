@@ -74,15 +74,26 @@ function resolveUri(UriInterface $base, UriInterface $uri): UriInterface
 }
 
 /**
- * Check if the DNS associated with the URL is valid (SSRF).
+ * Return the public IP addresses associated with an HTTP(S) URL.
+ *
+ * @return string[] An empty array means that the URL is not safe to fetch.
  */
-function isValidUrl(string $url): bool
+function getValidUrlIps(string $url): array
 {
-    // First, use standard PHP URL filtering.
-    if (!filter_var($url, FILTER_VALIDATE_URL)) {
-        return false;
+    if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+        return [];
     }
+
     $parts = parse_url($url);
+    if ($parts === false) {
+        return [];
+    }
+
+    $scheme = strtolower($parts['scheme'] ?? '');
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        return [];
+    }
+
     $host = $parts['host'] ?? '';
     // Normalize IPv6 literal formatting wrapping (e.g., [::1] -> ::1)
     if (strpos($host, '[') === 0 && strpos($host, ']') === (strlen($host) - 1)) {
@@ -90,7 +101,8 @@ function isValidUrl(string $url): bool
     }
     // Collect all IPs the host resolves to.
     $ips = [];
-    if (filter_var($host, FILTER_VALIDATE_IP)) {
+    $ips = [];
+    if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
         // The host is already a direct IP address literal.
         $ips[] = $host;
     }
@@ -100,27 +112,27 @@ function isValidUrl(string $url): bool
         $dnsAAAA = @dns_get_record($host, DNS_AAAA);
         if (is_array($dnsA)) {
             foreach ($dnsA as $record) {
-                if (isset($record['ip'])) {
-                     $ips[] = $record['ip'];
+                if (isset($record['ip']) && is_string($record['ip'])) {
+                    $ips[] = $record['ip'];
                 }
             }
         }
         if (is_array($dnsAAAA)) {
             foreach ($dnsAAAA as $record) {
-                if (isset($record['ipv6'])) {
+                if (isset($record['ipv6']) && is_string($record['ipv6'])) {
                     $ips[] = $record['ipv6'];
                 }
             }
         }
         // Fallback. If dns_get_record fails but gethostbyname finds something.
-        if (empty($ips)) {
+        if ($ips === []) {
             $fallbackIp = @gethostbyname($host);
             if ($fallbackIp !== $host) {
                 $ips[] = $fallbackIp;
             }
             else {
                 // If DNS resolution fails, treat URL as invalid.
-                return false;
+                return [];
             }
         }
     }
@@ -135,12 +147,21 @@ function isValidUrl(string $url): bool
             FILTER_VALIDATE_IP,
             FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE | FILTER_FLAG_GLOBAL_RANGE
         );
-        if (!$isPublic) {
+        if ($isPublic === false) {
             // The IP belongs to a restricted/private range.
-            return false;
+            return [];
         }
     }
-    return true;
+
+    return array_values(array_unique($ips));
+}
+
+/**
+ * Check if the DNS associated with the URL is valid (SSRF).
+ */
+function isValidUrl(string $url): bool
+{
+    return getValidUrlIps($url) !== [];
 }
 
 function isHttp(string $uri): bool
